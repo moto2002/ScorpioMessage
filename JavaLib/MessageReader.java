@@ -1,4 +1,4 @@
-﻿package Message;
+﻿package Scorpio.Message;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -31,9 +31,6 @@ public class MessageReader
         return reader.getDouble();
     }
     public String ReadString() {
-        return ReadString_impl();
-    }
-    private String ReadString_impl() {
     	try	{
             List<Byte> sb = new ArrayList<Byte>();
             byte ch;
@@ -46,6 +43,14 @@ public class MessageReader
     	} catch (Exception e) {}
     	return "";
     }
+    public byte[] ReadBytes()
+    {
+        int length = reader.getInt();
+        byte[] bytes = new byte[length];
+        reader.get(bytes);
+        return bytes;
+    }
+    
     public void Close() {
     }
 }

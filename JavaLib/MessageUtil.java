@@ -1,4 +1,4 @@
-package Message;
+package Scorpio.Message;
 
 import java.lang.reflect.Array;
 

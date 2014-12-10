@@ -1,4 +1,4 @@
-package Message;
+package Scorpio.Message;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 public class MessageWriter
@@ -29,9 +29,6 @@ public class MessageWriter
 		writer.putDouble(value);
 	}
 	public void WriteString(String value) {
-		WriteString_impl(value);
-	}
-	public void WriteString_impl(String value) {
     	try {
             if (value == null || value == "")  {
             	writer.put((byte)0);
@@ -40,6 +37,11 @@ public class MessageWriter
             	writer.put((byte)0);
             }
     	} catch (Exception e) { }
+	}
+    public void WriteBytes(byte[] value)
+    {
+        writer.putInt((int)value.length);
+        writer.put(value);
     }
 	public byte[] ToArray()
 	{
