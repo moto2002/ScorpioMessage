@@ -43,6 +43,7 @@ namespace ScorpioMessage
             new BasicType(5, "float", "float", "float", "WriteFloat", "ReadFloat") ,
             new BasicType(6, "double", "double", "double", "WriteDouble", "ReadDouble") ,
             new BasicType(7, "string", "string", "String", "WriteString", "ReadString") ,
+            new BasicType(8, "bytes", "byte[]", "byte[]", "WriteBytes", "ReadBytes") ,
         };
         private static List<MessageField> Fields = new List<MessageField>();
         static BasicType GetType(object index)
@@ -55,8 +56,45 @@ namespace ScorpioMessage
             return null;
         }
         private static ScriptTable GlobalTable;
+        private static string Package;
+        private static string Path;
+        private static string CSOut;
+        private static string JavaOut;
         static void Main(string[] args)
         {
+            try {
+                for (int i = 0; i < args.Length; ++i)
+                {
+                    if (args[i] == "-p")
+                    {
+                        Package = args[i + 1];
+                    }
+                    else if (args[i] == "-m")
+                    {
+                        Path = args[i + 1];
+                    }
+                    else if (args[i] == "-co")
+                    {
+                        CSOut = args[i + 1];
+                    }
+                    else if (args[i] == "-jo")
+                    {
+                        JavaOut = args[i + 1];
+                    }
+                }
+            } catch (System.Exception ex) {
+                Console.WriteLine("参数出错 -p [package] -m [sco配置目录] -co [cs生成目录] -jo [java生成目录] error : " + ex.ToString());
+                goto exit;
+            }
+            if (string.IsNullOrEmpty(Package) || string.IsNullOrEmpty(Path) || string.IsNullOrEmpty(CSOut) || string.IsNullOrEmpty(JavaOut))
+            {
+                Console.WriteLine("参数出错 -p [package] -m [sco配置目录] -co [cs生成目录] -jo [java生成目录]");
+                goto exit;
+            }
+            Console.WriteLine("Package = " + Package);
+            Console.WriteLine("Path = " + System.IO.Path.Combine(Environment.CurrentDirectory, Path));
+            Console.WriteLine("CSOut = " + System.IO.Path.Combine(Environment.CurrentDirectory, CSOut));
+            Console.WriteLine("JavaOut = " + System.IO.Path.Combine(Environment.CurrentDirectory, JavaOut));
             try {
                 StringBuilder basicBuilder = new StringBuilder();
                 foreach (var pair in BasicTypes) {
@@ -65,7 +103,7 @@ namespace ScorpioMessage
                 Script m_Script = new Script();
                 m_Script.LoadLibrary();
                 m_Script.LoadString(basicBuilder.ToString());
-                string[] files = Directory.GetFiles(Environment.CurrentDirectory + "/Message", "*.sco", SearchOption.AllDirectories);
+                string[] files = Directory.GetFiles(System.IO.Path.Combine(Environment.CurrentDirectory, Path), "*.sco", SearchOption.AllDirectories);
                 foreach (var file in files) {
                     m_Script.LoadFile(file);
                 }
@@ -85,6 +123,8 @@ namespace ScorpioMessage
             } catch (System.Exception ex) {
                 Console.WriteLine("error : " + ex.ToString());
             }
+        exit:
+            Console.WriteLine("按任意键继续");
             Console.ReadKey();
         }
         static void GenerateMessage(string className, ScriptTable table, bool cs)
@@ -109,12 +149,12 @@ namespace ScorpioMessage
                     }
                 }
                 StringBuilder builder = new StringBuilder();
-                if (!cs)
-                {
-                    builder.AppendLine(@"package Message;");
+                if (!cs) {
+                    builder.AppendLine(@"package " + Package + ";");
+                } else {
+                    builder.AppendLine(@"namespace " + Package + " {");
                 }
-                builder.Append(@"
-public class __ClassName {
+                builder.Append(@"public class __ClassName {
 ");
                 builder.Append(GenerateMessageFields(cs));
                 builder.Append(GenerateMessageWrite());
@@ -122,12 +162,24 @@ public class __ClassName {
                 builder.Append(GenerateMessageSerialize());
                 builder.Append(GenerateMessageDeserialize());
                 builder.Append(@"}");
-                builder.Replace("__ClassName", className);
-                //File.WriteAllText(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "/" + className + ".cs", builder.ToString(), Encoding.UTF8);
                 if (cs)
-                    File.WriteAllText(@"C:\Users\while\Desktop\TestMessage\" + className + ".cs", builder.ToString(), Encoding.UTF8);
+                    builder.Append("}");
+                builder.Replace("__ClassName", className);
+                string csdir = System.IO.Path.Combine(Environment.CurrentDirectory, CSOut);
+                {
+                    if (!Directory.Exists(csdir))
+                        Directory.CreateDirectory(csdir);
+                }
+                string javadir = System.IO.Path.Combine(Environment.CurrentDirectory, JavaOut);
+                {
+                    if (!Directory.Exists(javadir))
+                        Directory.CreateDirectory(javadir);
+                }
+
+                if (cs)
+                    File.WriteAllText(System.IO.Path.Combine(csdir, className + ".cs"), builder.ToString(), Encoding.UTF8);
                 else
-                    File.WriteAllText(@"C:\Users\while\Desktop\Prog\Scorpio-Java\trunk\src\Message\" + className + ".java", builder.ToString(), Encoding.UTF8);
+                    File.WriteAllText(System.IO.Path.Combine(javadir, className + ".java"), builder.ToString(), Encoding.UTF8);
             } catch (System.Exception ex) {
                 throw new Exception("生成协议 " + className + " 出错 " + ex.ToString());
             }
