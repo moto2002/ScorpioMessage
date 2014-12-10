@@ -150,9 +150,11 @@ namespace ScorpioMessage
                 }
                 StringBuilder builder = new StringBuilder();
                 if (!cs) {
-                    builder.AppendLine(@"package " + Package + ";");
+                    builder.AppendLine(@"package __Package;
+import Scorpio.Message.*;");
                 } else {
-                    builder.AppendLine(@"namespace " + Package + " {");
+                    builder.AppendLine(@"using Scorpio.Message;
+namespace __Package {");
                 }
                 builder.Append(@"public class __ClassName {
 ");
@@ -165,6 +167,7 @@ namespace ScorpioMessage
                 if (cs)
                     builder.Append("}");
                 builder.Replace("__ClassName", className);
+                builder.Replace("__Package", Package);
                 string csdir = System.IO.Path.Combine(Environment.CurrentDirectory, CSOut);
                 {
                     if (!Directory.Exists(csdir))
