@@ -1,1 +1,1 @@
-ScorpioMessage.exe -p message.message -m ./Message -co ./CS -jo ./Java
+ScorpioMessage.exe -p message.message -m ./Message -co ./CS -jo ./Java -so ./Sco
