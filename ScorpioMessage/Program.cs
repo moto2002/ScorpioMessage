@@ -30,6 +30,7 @@ namespace ScorpioMessage
         public BasicType Type;      //变量基本类型（如果是类则此值为null）
         public string TypeName;     //生成程序的类型
         public bool Array;          //是否是数组
+        public string SourceType;   //原始类型
     }
     class Program
     {
@@ -45,7 +46,6 @@ namespace ScorpioMessage
             new BasicType( "string", "string", "String", "WriteString", "ReadString") ,
             new BasicType( "bytes", "byte[]", "byte[]", "WriteBytes", "ReadBytes") ,
         };
-        private static List<MessageField> Fields = new List<MessageField>();
         static BasicType GetType(string index)
         {
             foreach (var info in BasicTypes)
@@ -85,11 +85,15 @@ namespace ScorpioMessage
                 Console.WriteLine("参数出错 -p [package] -m [sco配置目录] -co [cs生成目录] -jo [java生成目录] -so [Sco脚本生成目录]");
                 goto exit;
             }
+            Path = System.IO.Path.Combine(Environment.CurrentDirectory, Path);
+            CSOut = System.IO.Path.Combine(Environment.CurrentDirectory, CSOut);
+            JavaOut = System.IO.Path.Combine(Environment.CurrentDirectory, JavaOut);
+            ScoOut = System.IO.Path.Combine(Environment.CurrentDirectory, ScoOut);
             Console.WriteLine("Package = " + Package);
-            Console.WriteLine("Path = " + System.IO.Path.Combine(Environment.CurrentDirectory, Path));
-            Console.WriteLine("CSOut = " + System.IO.Path.Combine(Environment.CurrentDirectory, CSOut));
-            Console.WriteLine("JavaOut = " + System.IO.Path.Combine(Environment.CurrentDirectory, JavaOut));
-            Console.WriteLine("ScoOut = " + System.IO.Path.Combine(Environment.CurrentDirectory, ScoOut));
+            Console.WriteLine("Path = " + Path);
+            Console.WriteLine("CSOut = " + CSOut);
+            Console.WriteLine("JavaOut = " + JavaOut);
+            Console.WriteLine("ScoOut = " + ScoOut);
             try
             {
                 Script m_Script = new Script();
@@ -102,11 +106,12 @@ namespace ScorpioMessage
                         GlobalBasic.Add(itor.Current.Value);
                     }
                 }
-                string[] files = Directory.GetFiles(System.IO.Path.Combine(Environment.CurrentDirectory, Path), "*.sco", SearchOption.AllDirectories);
+                string[] files = Directory.GetFiles(Path, "*.sco", SearchOption.AllDirectories);
                 foreach (var file in files) {
                     m_Script.LoadFile(file);
                 }
                 {
+                    List<MessageField> Fields = new List<MessageField>();
                     GlobalTable = m_Script.GetGlobalTable();
                     var itor = GlobalTable.GetIterator();
                     while (itor.MoveNext()) {
@@ -114,8 +119,9 @@ namespace ScorpioMessage
                         string name = itor.Current.Key as string;
                         ScriptTable table = itor.Current.Value as ScriptTable;
                         if (name != null && table != null) {
-                            GenerateMessage(name, table, true);
-                            GenerateMessage(name, table, false);
+                            GenerateCS.Generate(name, Package, CSOut, GetFields(name, table, Fields, true));
+                            GenerateJava.Generate(name, Package, JavaOut, GetFields(name, table, Fields, false));
+                            GenerateScorpio.Generate(name, Package, ScoOut, GetFields(name, table, Fields, true));
                         }
                     }
                 }
@@ -127,210 +133,33 @@ namespace ScorpioMessage
             Console.WriteLine("按任意键继续");
             Console.ReadKey();
         }
-        static void GenerateMessage(string className, ScriptTable table, bool cs)
+        static List<MessageField> GetFields(string tableName, ScriptTable table, List<MessageField> Fields, bool cs)
         {
-            try
+            Fields.Clear();
+            var itor = table.GetIterator();
+            while (itor.MoveNext())
             {
-                Fields.Clear();
-                int index = 1;
-                var itor = table.GetIterator();
-                while (itor.MoveNext())
-                {
-                    string name = itor.Current.Key as string;
-                    ScriptObject info = itor.Current.Value;
-                    if (info is ScriptNumber || info is ScriptString)
-                    {
-                        BasicType type = GetType(info.ObjectValue);
-                        Fields.Add(new MessageField() { Index = index++, Type = type, Name = name, TypeName = type != null ? (cs ? type.CSharpName : type.JavaName) : (string)info.ObjectValue, Array = false });
-                    }
-                    else if (info is ScriptArray)
-                    {
-                        ScriptArray array = (ScriptArray)info;
-                        BasicType type = GetType(array.GetValue(0).ObjectValue);
-                        Fields.Add(new MessageField() { Index = index++, Type = type, Name = name, TypeName = type != null ? (cs ? type.CSharpName : type.JavaName) : (string)array.GetValue(0).ObjectValue, Array = array.Count() >= 1 ? (bool)info.GetValue(1).ObjectValue : false });
-                    }
-                }
-                StringBuilder builder = new StringBuilder();
-                if (!cs)
-                {
-                    builder.AppendLine(@"package __Package;
-import Scorpio.Message.*;");
-                }
-                else
-                {
-                    builder.AppendLine(@"using Scorpio.Message;
-namespace __Package {");
-                }
-                builder.Append(@"public class __ClassName {
-");
-                builder.Append(GenerateMessageFields(cs));
-                builder.Append(GenerateMessageWrite());
-                builder.Append(GenerateMessageRead());
-                builder.Append(GenerateMessageSerialize());
-                builder.Append(GenerateMessageDeserialize());
-                builder.Append(@"}");
-                if (cs)
-                    builder.Append("}");
-                builder.Replace("__ClassName", className);
-                builder.Replace("__Package", Package);
-                string csdir = System.IO.Path.Combine(Environment.CurrentDirectory, CSOut);
-                {
-                    if (!Directory.Exists(csdir))
-                        Directory.CreateDirectory(csdir);
-                }
-                string javadir = System.IO.Path.Combine(Environment.CurrentDirectory, JavaOut);
-                {
-                    if (!Directory.Exists(javadir))
-                        Directory.CreateDirectory(javadir);
-                }
-
-                if (cs)
-                    File.WriteAllText(System.IO.Path.Combine(csdir, className + ".cs"), builder.ToString(), Encoding.UTF8);
-                else
-                    File.WriteAllText(System.IO.Path.Combine(javadir, className + ".java"), builder.ToString(), Encoding.UTF8);
+                string name = itor.Current.Key as string;
+                ScriptString val = itor.Current.Value as ScriptString;
+                if (string.IsNullOrEmpty(name) || val == null)
+                    throw new Exception(string.Format("Message:{0} Field:{1} 参数出错 参数模版 \"索引,类型,是否数组=false\"", tableName, name));
+                string[] infos = val.Value.Split(',');
+                if (infos.Length < 2)
+                    throw new Exception(string.Format("Message:{0} Field:{1} 参数出错 参数模版 \"索引,类型,是否数组=false\"", tableName, name));
+                bool array = infos.Length > 2 && infos[2] == "true";
+                BasicType type = GetType(infos[1]);
+                Fields.Add(new MessageField() { 
+                    Index = int.Parse(infos[0]), 
+                    SourceType = infos[1],
+                    Type = type, 
+                    Name = name, 
+                    TypeName = type != null ? (cs ? type.CSharpName : type.JavaName) : infos[1], 
+                    Array = array });
             }
-            catch (System.Exception ex)
-            {
-                throw new Exception("生成协议 " + className + " 出错 " + ex.ToString());
-            }
-        }
-        static string GenerateMessageFields(bool cs)
-        {
-            StringBuilder builder = new StringBuilder();
-            builder.AppendLine(@"    private int __Sign = 0;
-    private void AddSign(int index) {
-        if ((__Sign & (1 << index)) == 0)
-            __Sign |= (1 << index);
-    }
-    public __Bool HasSign(int index) {
-        return (__Sign & (1 << index)) != 0;
-    }");
-            builder = builder.Replace("__Bool", cs ? "bool" : "boolean");
-            for (int i = 0; i < Fields.Count; ++i)
-            {
-                var field = Fields[i];
-                string str = "";
-                if (field.Array)
-                {
-                    str = @"    private __TypeName[] ___Name;
-    public __TypeName[] get__Name() { return ___Name; }
-    public void set__Name(__TypeName[] value) { ___Name = value; AddSign(__Index); } ";
-                }
-                else
-                {
-                    str = @"    private __TypeName ___Name;
-    public __TypeName get__Name() { return ___Name; }
-    public void set__Name(__TypeName value) { ___Name = value; AddSign(__Index); } ";
-                }
-                str = str.Replace("__TypeName", field.TypeName);
-                str = str.Replace("__Name", field.Name);
-                str = str.Replace("__Index", field.Index.ToString());
-                builder.AppendLine(str);
-            }
-            return builder.ToString();
-        }
-        static string GenerateMessageWrite()
-        {
-            StringBuilder builder = new StringBuilder();
-            builder.AppendLine(@"    public void Write(MessageWriter writer) {
-        writer.WriteInt32(__Sign);");
-            foreach (var field in Fields)
-            {
-                string str = "";
-                if (field.Array)
-                {
-                    str = @"        if (HasSign(__Index)) {
-            writer.WriteInt32(MessageUtil.GetArrayLength(___Name));
-            for (int i = 0;i < MessageUtil.GetArrayLength(___Name); ++i) {
-                __FieldWrite
-            }
-        }";
-                }
-                else
-                {
-                    str = @"        if (HasSign(__Index)) {
-            __FieldWrite
-        }";
-                }
-                str = str.Replace("__FieldWrite", WriteFieldString(field, field.Array ? "___Name[i]" : "___Name"));
-                str = str.Replace("__Write", field.Type != null ? field.Type.WriteFunction : "");
-                str = str.Replace("__Index", field.Index.ToString());
-                str = str.Replace("__Name", field.Name);
-                builder.AppendLine(str);
-            }
-            builder.AppendLine(@"    }");
-            return builder.ToString();
-        }
-        static string WriteFieldString(MessageField field, string name)
-        {
-            string str = "";
-            if (field.Type == null)
-                str = "__Name.Write(writer);";
-            else
-                str = "writer.__Write(__Name);";
-            return str.Replace("__Name", name);
-        }
-        static string GenerateMessageRead()
-        {
-            StringBuilder builder = new StringBuilder();
-            builder.AppendLine(@"    public static __ClassName Read(MessageReader reader) {
-        __ClassName ret = new __ClassName();
-        ret.__Sign = reader.ReadInt32();");
-            foreach (var field in Fields)
-            {
-                string str = "";
-                if (field.Array)
-                {
-                    str = @"        if (ret.HasSign(__Index)) {
-            ret.___Name = new __TypeName[reader.ReadInt32()];
-            for (int i = 0;i < MessageUtil.GetArrayLength(ret.___Name); ++i) {
-                ret.___Name[i] = __FieldRead;
-            }
-        }";
-                }
-                else
-                {
-                    str = @"        if (ret.HasSign(__Index)) {
-            ret.___Name = __FieldRead;
-        }";
-                }
-                str = str.Replace("__FieldRead", ReadFieldString(field));
-                str = str.Replace("__Read", field.Type != null ? field.Type.ReadFunction : "");
-                str = str.Replace("__TypeName", field.TypeName);
-                str = str.Replace("__Index", field.Index.ToString());
-                str = str.Replace("__Name", field.Name);
-                builder.AppendLine(str);
-            }
-            builder.AppendLine(@"        return ret;
-    }");
-            return builder.ToString();
-        }
-        static string ReadFieldString(MessageField field)
-        {
-            string str = "";
-            if (field.Type == null)
-                str = "__TypeName.Read(reader)";
-            else
-                str = "reader.__Read()";
-            return str;
-        }
-        static string GenerateMessageSerialize()
-        {
-            StringBuilder builder = new StringBuilder();
-            builder.AppendLine(@"    public byte[] Serialize() {
-        MessageWriter writer = new MessageWriter();
-        Write(writer);
-        return writer.ToArray();
-    }");
-            return builder.ToString();
-        }
-        static string GenerateMessageDeserialize()
-        {
-            StringBuilder builder = new StringBuilder();
-            builder.AppendLine(@"    public static __ClassName Deserialize(byte[] data) {
-        return Read(new MessageReader(data));
-    }");
-            return builder.ToString();
+            Fields.Sort((m1, m2) => {
+                    return m1.Index.CompareTo(m2.Index);
+                });
+            return Fields;
         }
     }
 }
