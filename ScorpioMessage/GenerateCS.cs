@@ -24,7 +24,7 @@ namespace __Package {
             builder.Replace("__ClassName", className);
             builder.Replace("__Package", Package);
             if (!Directory.Exists(outPath)) Directory.CreateDirectory(outPath);
-            File.WriteAllText(System.IO.Path.Combine(outPath, className + ".cs"), builder.ToString(), Encoding.UTF8);
+            File.WriteAllBytes(System.IO.Path.Combine(outPath, className + ".cs"), Encoding.UTF8.GetBytes(builder.ToString()));
         }
         static string GenerateMessageFields()
         {
@@ -98,7 +98,7 @@ namespace __Package {
                     str = @"
             if (ret.HasSign(__Index)) {
                 ret.___Name = new __TypeName[reader.ReadInt32()];
-                for (int i = 0;i < MessageUtil.GetArrayLength(ret.___Name); ++i) { ret.___Name[i] = __FieldRead; }
+                for (int i = 0;i < ret.___Name.Length; ++i) { ret.___Name[i] = __FieldRead; }
             }";
                 } else {
                     str = @"

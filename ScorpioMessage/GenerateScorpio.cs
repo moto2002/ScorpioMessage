@@ -13,7 +13,8 @@ namespace ScorpioMessage
             foreach (var field in fields)
             {
                 string str = @"
-    { Name = ""__Name"", Type = ""__Type"", Array = __Array },";
+    { Index = __Index, Name = ""__Name"", Type = ""__Type"", Array = __Array },";
+                str = str.Replace("__Index", field.Index.ToString());
                 str = str.Replace("__Name", field.Name);
                 str = str.Replace("__Type", field.SourceType);
                 str = str.Replace("__Array", field.Array ? "true" : "false");
@@ -23,7 +24,7 @@ namespace ScorpioMessage
 ]");
             builder = builder.Replace("__ClassName", className);
             if (!Directory.Exists(outPath)) Directory.CreateDirectory(outPath);
-            File.WriteAllText(System.IO.Path.Combine(outPath, className + ".sco"), builder.ToString(), Encoding.UTF8);
+            File.WriteAllBytes(System.IO.Path.Combine(outPath, className + ".sco"), Encoding.UTF8.GetBytes(builder.ToString()));
         }
     }
 }

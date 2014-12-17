@@ -23,7 +23,7 @@ import Scorpio.Message.*;
             builder.Replace("__ClassName", className);
             builder.Replace("__Package", Package);
             if (!Directory.Exists(outPath)) Directory.CreateDirectory(outPath);
-            File.WriteAllText(System.IO.Path.Combine(outPath, className + ".java"), builder.ToString(), Encoding.UTF8);
+            File.WriteAllBytes(System.IO.Path.Combine(outPath, className + ".java"), Encoding.UTF8.GetBytes(builder.ToString()));
         }
         static string GenerateMessageFields()
         {
@@ -65,8 +65,8 @@ import Scorpio.Message.*;
                 {
                     str = @"
             if (HasSign(__Index)) {
-                writer.WriteInt32(___Name.Length);
-                for (int i = 0;i < ___Name.Length; ++i) { __FieldWrite; }
+                writer.WriteInt32(___Name.length);
+                for (int i = 0;i < ___Name.length; ++i) { __FieldWrite; }
             }";
                 }
                 else
@@ -105,7 +105,7 @@ import Scorpio.Message.*;
                     str = @" 
             if (ret.HasSign(__Index)) {
                 ret.___Name = new __TypeName[reader.ReadInt32()];
-                for (int i = 0;i < MessageUtil.GetArrayLength(ret.___Name); ++i) { ret.___Name[i] = __FieldRead; }
+                for (int i = 0;i <ret.___Name.length; ++i) { ret.___Name[i] = __FieldRead; }
             }";
                 }
                 else
