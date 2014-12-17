@@ -56,7 +56,8 @@ import Scorpio.Message.*;
         {
             StringBuilder builder = new StringBuilder();
             builder.Append(@"
-        public override void Write(MessageWriter writer) {
+        @Override
+        public void Write(MessageWriter writer) {
             writer.WriteInt32(__Sign);");
             foreach (var field in Fields)
             {
