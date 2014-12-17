@@ -4,12 +4,11 @@ namespace Scorpio.Message
     public abstract class IMessage
     {
         protected int __Sign = 0;
-        private void AddSign(int index) {
-            if ((__Sign & (1 << index)) == 0)
-                __Sign |= (1 << index);
+        protected void AddSign(int index) {
+            __Sign = MessageUtil.AddSign(__Sign, index);
         }
         public bool HasSign(int index) {
-            return (__Sign & (1 << index)) != 0;
+            return MessageUtil.HasSign(__Sign, index);
         }
         public byte[] Serialize() {
             MessageWriter writer = new MessageWriter();

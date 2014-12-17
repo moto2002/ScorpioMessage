@@ -41,12 +41,9 @@ namespace Scorpio.Message
         }
         public void WriteString(string value)
         {
-            if (string.IsNullOrEmpty(value))
-            {
+            if (string.IsNullOrEmpty(value)) {
                 writer.Write((byte)0);
-            }
-            else
-            {
+            } else {
                 writer.Write(Encoding.UTF8.GetBytes(value));
                 writer.Write((byte)0);
             }
