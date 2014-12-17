@@ -1,15 +1,14 @@
 package Scorpio.Message;
-public abstract class IMessage
-{
+
+public abstract class IMessage {
     protected int __Sign = 0;
-    private void AddSign(int index) {
-        if ((__Sign & (1 << index)) == 0)
-            __Sign |= (1 << index);
+    protected final void AddSign(int index) {
+        __Sign = MessageUtil.AddSign(__Sign, index);
     }
-    public boolean HasSign(int index) {
-        return (__Sign & (1 << index)) != 0;
+    public final boolean HasSign(int index) {
+        return MessageUtil.HasSign(__Sign, index);
     }
-    public byte[] Serialize() {
+    public final byte[] Serialize() {
         MessageWriter writer = new MessageWriter();
         Write(writer);
         return writer.ToArray();
